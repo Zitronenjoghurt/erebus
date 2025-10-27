@@ -1,56 +1,38 @@
 use crate::error::ErebusResult;
-use std::sync::mpsc::{Receiver, Sender};
+use crate::server::connection_handler::ConnectionHandler;
+use tokio::net::TcpListener;
+use tracing::info;
 
 #[cfg(feature = "server")]
-pub mod command;
 mod connection;
 #[cfg(feature = "server")]
 mod connection_handler;
-#[cfg(feature = "server")]
-mod context;
-#[cfg(feature = "server")]
-pub mod event;
 pub mod message;
 
 #[cfg(feature = "server")]
 pub struct ErebusServer {
-    command_sender: Sender<command::ServerCommand>,
-    event_receiver: Receiver<event::ServerEvent>,
-    thread_handle: Option<std::thread::JoinHandle<()>>,
+    listener: TcpListener,
+    connection_handler: ConnectionHandler,
 }
 
 #[cfg(feature = "server")]
 impl ErebusServer {
-    pub fn start(server_port: impl AsRef<str>) -> ErebusResult<Self> {
-        let (command_sender, command_receiver) = std::sync::mpsc::channel();
-        let (event_sender, event_receiver) = std::sync::mpsc::channel();
-
-        let thread_handle =
-            context::ErebusServerContext::spawn(server_port, command_receiver, event_sender)?;
+    pub async fn bind(server_port: impl AsRef<str>) -> ErebusResult<Self> {
+        let address = format!("{}:{}", "127.0.0.1", server_port.as_ref());
+        let listener = TcpListener::bind(address).await?;
+        info!("Listening on {}", listener.local_addr()?);
 
         Ok(Self {
-            command_sender,
-            event_receiver,
-            thread_handle: Some(thread_handle),
+            listener,
+            connection_handler: ConnectionHandler::new(),
         })
     }
 
-    pub fn poll_events(&self) -> Vec<event::ServerEvent> {
-        self.event_receiver.try_iter().collect()
-    }
-
-    pub fn send_message(&self, message: message::ServerMessage) {
-        let _ = self
-            .command_sender
-            .send(command::ServerCommand::Send(message));
-    }
-}
-
-#[cfg(feature = "server")]
-impl Drop for ErebusServer {
-    fn drop(&mut self) {
-        if let Some(thread_handle) = self.thread_handle.take() {
-            let _ = thread_handle.join();
+    pub async fn run(&self) -> ErebusResult<()> {
+        loop {
+            let (stream, addr) = self.listener.accept().await?;
+            info!("Incoming connection from {}", addr);
+            self.connection_handler.handle(stream, addr);
         }
     }
 }

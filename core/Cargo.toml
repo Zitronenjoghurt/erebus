@@ -5,7 +5,7 @@ edition = "2024"
 
 [features]
 default = []
-client = []
+client = ["tokio/time"]
 server = ["tokio/sync"]
 
 [dependencies]
@@ -13,4 +13,5 @@ bincode = "2.0.1"
 dashmap = "6.1.0"
 thiserror = "2.0.17"
 tokio = { version = "1.48.0", features = ["rt-multi-thread", "macros", "io-util", "net"] }
+tracing = { version = "0.1.41", features = ["release_max_level_off"] }
 zstd = "0.13.3"

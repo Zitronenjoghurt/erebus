@@ -1,6 +1,8 @@
 use crate::error::ErebusResult;
+use crate::formatting::format_byte_size;
 use bincode::{Decode, Encode};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tracing::debug;
 
 pub struct Message {
     length: u32,
@@ -14,6 +16,13 @@ impl Message {
     {
         let uncompressed = bincode::encode_to_vec(encodable, bincode::config::standard())?;
         let compressed = zstd::encode_all(uncompressed.as_slice(), 0)?;
+
+        debug!(
+            "Message encoded ({}) =zstd=> ({})",
+            format_byte_size(uncompressed.len()),
+            format_byte_size(compressed.len())
+        );
+
         Ok(Self {
             length: compressed.len() as u32,
             data: compressed,
@@ -26,6 +35,13 @@ impl Message {
     {
         let decompressed = zstd::decode_all(self.data.as_slice())?;
         let (decoded, _) = bincode::decode_from_slice(&decompressed, bincode::config::standard())?;
+
+        debug!(
+            "Message decoded ({}) =zstd=> ({})",
+            format_byte_size(self.data.len()),
+            format_byte_size(decompressed.len())
+        );
+
         Ok(decoded)
     }
 
@@ -37,8 +53,12 @@ impl Message {
         reader.read_exact(&mut len_bytes).await?;
         let length = u32::from_be_bytes(len_bytes);
 
+        debug!("Read message length: {}", format_byte_size(length as usize));
+
         let mut data = vec![0u8; length as usize];
         reader.read_exact(&mut data).await?;
+
+        debug!("Read message data: {}", format_byte_size(data.len()));
 
         Ok(Self { length, data })
     }
@@ -50,7 +70,14 @@ impl Message {
         let len_bytes: [u8; 4] = self.length.to_be_bytes();
         writer.write_all(&len_bytes).await?;
 
+        debug!(
+            "Wrote message length: {}",
+            format_byte_size(self.length as usize)
+        );
+
         writer.write_all(&self.data).await?;
+        debug!("Wrote message data: {}", format_byte_size(self.data.len()));
+
         Ok(())
     }
 }

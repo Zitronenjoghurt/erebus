@@ -60,7 +60,10 @@ impl ErebusClientContext {
                 command_result = async {
                     match self.command_receiver.try_recv() {
                         Ok(command) => Ok(Some(command)),
-                        Err(TryRecvError::Empty) => Ok(None),
+                        Err(TryRecvError::Empty) => {
+                            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+                            Ok(None)
+                        },
                         Err(TryRecvError::Disconnected) => Err(ErebusError::ContextDisconnected),
                     }
                 } => {

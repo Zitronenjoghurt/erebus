@@ -1,11 +1,18 @@
 use erebus_core::server::ErebusServer;
 
-fn main() {
-    let server = ErebusServer::start("56469").unwrap();
-    loop {
-        for event in server.poll_events() {
-            println!("{event:?}")
-        }
-        std::thread::sleep(std::time::Duration::from_millis(100));
-    }
+#[tokio::main]
+async fn main() {
+    #[cfg(debug_assertions)]
+    init_tracing();
+
+    let server = ErebusServer::bind("58469").await.unwrap();
+    server.run().await.unwrap();
+}
+
+#[cfg(debug_assertions)]
+fn init_tracing() {
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::TRACE)
+        .with_span_events(tracing_subscriber::fmt::format::FmtSpan::CLOSE)
+        .init();
 }
