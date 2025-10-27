@@ -1,5 +1,6 @@
 use crate::error::ErebusResult;
 use crate::server::connection_handler::ConnectionHandler;
+use crate::server::state::ErebusServerState;
 use tokio::net::TcpListener;
 use tracing::info;
 
@@ -7,10 +8,16 @@ use tracing::info;
 mod connection;
 #[cfg(feature = "server")]
 mod connection_handler;
+#[cfg(feature = "server")]
+mod entities;
 pub mod message;
+#[cfg(feature = "server")]
+mod services;
+pub mod state;
 
 #[cfg(feature = "server")]
 pub struct ErebusServer {
+    state: ErebusServerState,
     listener: TcpListener,
     connection_handler: ConnectionHandler,
 }
@@ -18,17 +25,22 @@ pub struct ErebusServer {
 #[cfg(feature = "server")]
 impl ErebusServer {
     pub async fn bind(server_port: impl AsRef<str>) -> ErebusResult<Self> {
+        let state = ErebusServerState::new()?;
+        info!("State initialized");
+
         let address = format!("{}:{}", "127.0.0.1", server_port.as_ref());
         let listener = TcpListener::bind(address).await?;
-        info!("Listening on {}", listener.local_addr()?);
+        info!("TCP listener bound");
 
         Ok(Self {
+            state,
             listener,
             connection_handler: ConnectionHandler::new(),
         })
     }
 
     pub async fn run(&self) -> ErebusResult<()> {
+        info!("Listening on {}", self.listener.local_addr()?);
         loop {
             let (stream, addr) = self.listener.accept().await?;
             info!("Incoming connection from {}", addr);
