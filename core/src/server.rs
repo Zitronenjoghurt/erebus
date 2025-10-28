@@ -40,7 +40,13 @@ impl ErebusServer {
     }
 
     pub async fn run(&self) -> ErebusResult<()> {
+        #[cfg(debug_assertions)]
         info!("Listening on {}", self.listener.local_addr()?);
+        #[cfg(not(debug_assertions))]
+        println!(
+            "Listening on {}, there will be no logs",
+            self.listener.local_addr()?
+        );
         loop {
             let (stream, addr) = self.listener.accept().await?;
             info!("Incoming connection from {}", addr);

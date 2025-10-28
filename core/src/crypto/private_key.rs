@@ -1,5 +1,3 @@
-use base64::engine::general_purpose::STANDARD;
-use base64::Engine;
 use rand_core::OsRng;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use x25519_dalek::StaticSecret;
@@ -13,10 +11,6 @@ impl PrivateKey {
 
     pub fn generate() -> Self {
         Self(StaticSecret::random_from_rng(OsRng))
-    }
-
-    pub fn as_base64(&self) -> String {
-        STANDARD.encode(self.0.to_bytes())
     }
 }
 

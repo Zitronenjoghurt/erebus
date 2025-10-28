@@ -1,19 +1,59 @@
+use crate::crypto::password::Password;
 use crate::database::entity::{Entity, MultiEntity};
-use crate::error::ErebusResult;
-use redb::{ReadableDatabase, ReadableMultimapTable, ReadableTable};
+use crate::database::pw_verify::PasswordVerifier;
+use crate::error::{ErebusError, ErebusResult};
+use redb::{ReadableDatabase, ReadableMultimapTable, ReadableTable, ReadableTableMetadata};
 use std::path::Path;
 
 pub mod entity;
+mod pw_verify;
 
-#[derive(Debug)]
 pub struct Database {
     db: redb::Database,
+    password: Password,
 }
 
 impl Database {
-    pub fn initialize(directory: &Path) -> ErebusResult<Self> {
-        let db = redb::Database::create(directory)?;
-        Ok(Self { db })
+    pub fn initialize(path: &Path) -> ErebusResult<Self> {
+        let create_new = !path.exists();
+        let password = if create_new {
+            println!("To create a new database, please enter a password. It will be used to encrypt all data in the database. You will be prompted for the password again to confirm it and you will have to enter it every time you start the Erebus server.");
+            Password::prompt_with_confirmation()
+        } else {
+            println!("Please enter the database password.");
+            Password::prompt()
+        }
+        .ok_or(ErebusError::PasswordUndisclosable)?;
+
+        let redb = redb::Database::create(path)?;
+        let db = Self { db: redb, password };
+
+        if create_new {
+            db.create_password_verifier()?;
+        }
+        db.verify_password()?;
+
+        Ok(db)
+    }
+
+    fn create_password_verifier(&self) -> ErebusResult<()> {
+        let pw_verifier = PasswordVerifier::new();
+        self.save(&pw_verifier)?;
+        Ok(())
+    }
+
+    fn verify_password(&self) -> ErebusResult<()> {
+        let Ok(Some(pw_verifier)) =
+            self.find::<PasswordVerifier>(PasswordVerifier::PW_VERIFY_STRING.to_string())
+        else {
+            return Err(ErebusError::PasswordUndisclosable);
+        };
+
+        if !pw_verifier.verify() {
+            Err(ErebusError::PasswordUndisclosable)
+        } else {
+            Ok(())
+        }
     }
 
     fn open_table_or_empty<E: Entity>(
@@ -43,7 +83,7 @@ impl Database {
         let txn = self.db.begin_write()?;
         {
             let mut table = txn.open_table(E::table_def())?;
-            let bytes = entity.encode()?;
+            let bytes = entity.encode(&self.password)?;
             table.insert(entity.id(), &bytes)?;
         }
         txn.commit()?;
@@ -55,7 +95,7 @@ impl Database {
         let txn = self.db.begin_write()?;
         {
             let mut table = txn.open_multimap_table(E::multimap_table_def())?;
-            let bytes = entity.encode()?;
+            let bytes = entity.encode(&self.password)?;
             table.insert(entity.id(), &*bytes)?;
         }
         txn.commit()?;
@@ -73,7 +113,7 @@ impl Database {
             return Ok(None);
         };
 
-        let entity = E::decode(&data)?;
+        let entity = E::decode(&data, &self.password)?;
         Ok(Some(entity))
     }
 
@@ -90,7 +130,7 @@ impl Database {
         for item in table.get(id)? {
             let guard = item?;
             let bytes = guard.value().to_vec();
-            let entity = E::decode(&bytes)?;
+            let entity = E::decode(&bytes, &self.password)?;
             results.push(entity);
         }
 
@@ -98,9 +138,9 @@ impl Database {
     }
 
     #[tracing::instrument(level = "trace", skip_all)]
-    pub fn map<E: Entity, F>(&self, mut f: F) -> ErebusResult<()>
+    pub fn for_each<E: Entity, F>(&self, f: F) -> ErebusResult<()>
     where
-        F: FnMut(E) -> ErebusResult<()>,
+        F: Fn(E) -> ErebusResult<()>,
     {
         let txn = self.db.begin_read()?;
         let Some(table) = self.open_table_or_empty::<E>(&txn)? else {
@@ -109,7 +149,7 @@ impl Database {
 
         for result in table.iter()? {
             let (_key, guard) = result?;
-            let entity = E::decode(&guard.value())?;
+            let entity = E::decode(&guard.value(), &self.password)?;
             f(entity)?;
         }
 
@@ -117,9 +157,9 @@ impl Database {
     }
 
     #[tracing::instrument(level = "trace", skip_all)]
-    pub fn map_multi<E: MultiEntity, F>(&self, mut f: F) -> ErebusResult<()>
+    pub fn for_each_multi<E: MultiEntity, F>(&self, f: F) -> ErebusResult<()>
     where
-        F: FnMut(E) -> ErebusResult<()>,
+        F: Fn(E) -> ErebusResult<()>,
     {
         let txn = self.db.begin_read()?;
         let table = match txn.open_multimap_table(E::multimap_table_def()) {
@@ -133,11 +173,35 @@ impl Database {
             for value_result in values {
                 let value = value_result?;
                 let bytes = value.value();
-                let entity = E::decode(bytes)?;
+                let entity = E::decode(bytes, &self.password)?;
                 f(entity)?;
             }
         }
 
         Ok(())
+    }
+
+    #[tracing::instrument(level = "trace", skip_all)]
+    pub fn count<E: Entity>(&self) -> ErebusResult<u64> {
+        let txn = self.db.begin_read()?;
+
+        let Some(table) = self.open_table_or_empty::<E>(&txn)? else {
+            return Ok(0);
+        };
+
+        Ok(table.len().unwrap_or(0))
+    }
+
+    #[tracing::instrument(level = "trace", skip_all)]
+    pub fn count_multi<E: MultiEntity>(&self) -> ErebusResult<u64> {
+        let txn = self.db.begin_read()?;
+
+        let table = match txn.open_multimap_table(E::multimap_table_def()) {
+            Ok(table) => table,
+            Err(redb::TableError::TableDoesNotExist(_)) => return Ok(0),
+            Err(e) => return Err(e.into()),
+        };
+
+        Ok(table.len().unwrap_or(0))
     }
 }

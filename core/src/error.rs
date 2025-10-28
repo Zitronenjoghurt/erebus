@@ -6,6 +6,12 @@ pub type ErebusResult<T> = Result<T, ErebusError>;
 pub enum ErebusError {
     #[error("Lost connection to the context thread")]
     ContextDisconnected,
+    #[error("Encryption error")]
+    Encryption,
+    #[error("Decryption error")]
+    Decryption,
+    #[error("Something went wrong with a password which can't be disclosed")]
+    PasswordUndisclosable,
     #[error("Client error: {0}")]
     Client(#[from] crate::client::error::ErebusClientError),
     #[error("Database error: {0}")]

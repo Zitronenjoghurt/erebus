@@ -1,3 +1,4 @@
+use crate::crypto::password::Password;
 use crate::error::ErebusResult;
 use redb::{MultimapTableDefinition, TableDefinition};
 use serde::{Deserialize, Serialize};
@@ -15,12 +16,12 @@ pub trait Entity: Sized + Serialize + for<'de> Deserialize<'de> {
         TableDefinition::new(Self::table_name())
     }
 
-    fn encode(&self) -> ErebusResult<Vec<u8>> {
-        Ok(rmp_serde::to_vec_named(self)?)
+    fn encode(&self, password: &Password) -> ErebusResult<Vec<u8>> {
+        password.encrypt(&rmp_serde::to_vec_named(self)?)
     }
 
-    fn decode(bytes: &[u8]) -> ErebusResult<Self> {
-        Ok(rmp_serde::from_slice(bytes)?)
+    fn decode(bytes: &[u8], password: &Password) -> ErebusResult<Self> {
+        Ok(rmp_serde::from_slice(&password.decrypt(bytes)?)?)
     }
 }
 
@@ -36,11 +37,11 @@ pub trait MultiEntity: Sized + Serialize + for<'de> Deserialize<'de> + Debug {
         MultimapTableDefinition::new(Self::multimap_table_name())
     }
 
-    fn encode(&self) -> ErebusResult<Vec<u8>> {
-        Ok(rmp_serde::to_vec_named(self)?)
+    fn encode(&self, password: &Password) -> ErebusResult<Vec<u8>> {
+        password.encrypt(&rmp_serde::to_vec_named(self)?)
     }
 
-    fn decode(bytes: &[u8]) -> ErebusResult<Self> {
-        Ok(rmp_serde::from_slice(bytes)?)
+    fn decode(bytes: &[u8], password: &Password) -> ErebusResult<Self> {
+        Ok(rmp_serde::from_slice(&password.decrypt(bytes)?)?)
     }
 }

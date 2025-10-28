@@ -1,5 +1,5 @@
 use crate::crypto::private_key::PrivateKey;
-use base64::engine::general_purpose::STANDARD;
+use base64::prelude::BASE64_URL_SAFE_NO_PAD;
 use base64::Engine;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -15,7 +15,7 @@ impl PublicKey {
     }
 
     pub fn as_base64(&self) -> String {
-        STANDARD.encode(self.0.to_bytes())
+        BASE64_URL_SAFE_NO_PAD.encode(self.0.to_bytes())
     }
 }
 

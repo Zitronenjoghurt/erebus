@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use tracing::info;
 
 pub struct ErebusServerState {
-    db: Database,
+    pub(crate) db: Database,
     service: Services,
 }
 

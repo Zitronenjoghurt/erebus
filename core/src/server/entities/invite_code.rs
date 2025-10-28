@@ -22,11 +22,16 @@ impl Entity for InviteCode {
 }
 
 impl InviteCode {
+    #[tracing::instrument(level = "trace", skip_all)]
     pub fn generate() -> Self {
         let (public, private) = crate::crypto::x25519_keypair();
         Self {
             code: public,
             verify: private,
         }
+    }
+
+    pub fn get_code_string(&self) -> String {
+        self.code.as_base64()
     }
 }
