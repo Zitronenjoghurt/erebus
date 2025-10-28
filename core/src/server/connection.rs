@@ -3,6 +3,7 @@ use crate::error::ErebusResult;
 use crate::message::{MessageRecv, MessageSend};
 use crate::server::connection_handler::ConnectionHandler;
 use crate::server::message::ServerMessage;
+use crate::server::socket_id::SocketId;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
@@ -11,17 +12,17 @@ use tokio::sync::Mutex;
 use tracing::{debug, info};
 
 pub struct Connection {
-    addr: SocketAddr,
+    id: SocketId,
     connections: ConnectionHandler,
     writer: Arc<Mutex<OwnedWriteHalf>>,
 }
 
 impl Connection {
-    pub fn spawn(connections: ConnectionHandler, stream: TcpStream, addr: SocketAddr) -> Arc<Self> {
+    pub fn spawn(connections: ConnectionHandler, stream: TcpStream, id: SocketId) -> Arc<Self> {
         let (reader, writer) = stream.into_split();
 
         let connection = Arc::new(Self {
-            addr,
+            id,
             connections,
             writer: Arc::new(Mutex::new(writer)),
         });
@@ -30,19 +31,19 @@ impl Connection {
         tokio::spawn(async move {
             let result = connection_clone.listen(reader).await;
             if let Err(e) = result {
-                info!("Lost connection with {}: {}", addr, e);
+                info!("Lost connection {}: {}", id, e);
             } else {
-                info!("Lost connection with {}", addr);
+                info!("Lost connection {}", id);
             }
 
-            connection_clone.connections.remove(connection_clone.addr);
+            connection_clone.connections.remove(connection_clone.id);
         });
 
         connection
     }
 
     async fn listen(&self, mut reader: OwnedReadHalf) -> ErebusResult<()> {
-        debug!("Connection from {} is listening", self.addr);
+        debug!("Connection {} is listening", self.id);
         loop {
             let message = ClientMessage::recv(&mut reader).await?;
             self.handle_message(message).await?;

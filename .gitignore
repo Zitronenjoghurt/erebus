@@ -22,3 +22,5 @@ target
 
 # Custom
 build
+server-docker/data
+server-docker/cli

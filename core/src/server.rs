@@ -1,5 +1,7 @@
+use crate::crypto::sha256_bytes;
 use crate::error::ErebusResult;
 use crate::server::connection_handler::ConnectionHandler;
+use crate::server::socket_id::SocketId;
 use crate::server::state::ErebusServerState;
 use tokio::net::TcpListener;
 use tracing::info;
@@ -13,6 +15,7 @@ mod entities;
 pub mod message;
 #[cfg(feature = "server")]
 mod services;
+pub mod socket_id;
 pub mod state;
 
 #[cfg(feature = "server")]
@@ -28,7 +31,7 @@ impl ErebusServer {
         let state = ErebusServerState::new()?;
         info!("State initialized");
 
-        let address = format!("{}:{}", "127.0.0.1", server_port.as_ref());
+        let address = format!("{}:{}", "0.0.0.0", server_port.as_ref());
         let listener = TcpListener::bind(address).await?;
         info!("TCP listener bound");
 
@@ -40,17 +43,12 @@ impl ErebusServer {
     }
 
     pub async fn run(&self) -> ErebusResult<()> {
-        #[cfg(debug_assertions)]
         info!("Listening on {}", self.listener.local_addr()?);
-        #[cfg(not(debug_assertions))]
-        println!(
-            "Listening on {}, there will be no logs",
-            self.listener.local_addr()?
-        );
         loop {
             let (stream, addr) = self.listener.accept().await?;
-            info!("Incoming connection from {}", addr);
-            self.connection_handler.handle(stream, addr);
+            let socket_id = SocketId::from(addr);
+            info!("Connected to {}", socket_id);
+            self.connection_handler.handle(stream, socket_id);
         }
     }
 }

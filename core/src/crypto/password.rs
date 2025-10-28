@@ -21,19 +21,10 @@ impl Password {
         Some(Self(key))
     }
 
-    pub fn prompt() -> Option<Self> {
-        let password = Zeroizing::new(rpassword::prompt_password("Password:").ok()?);
-        Self::from_string(password)
-    }
-
-    pub fn prompt_with_confirmation() -> Option<Self> {
-        let password = Zeroizing::new(rpassword::prompt_password("Password:").ok()?);
-        let confirmation = Zeroizing::new(rpassword::prompt_password("Confirm password:").ok()?);
-        if password == confirmation {
-            Self::from_string(password)
-        } else {
-            None
-        }
+    pub fn from_env(key: &str) -> Option<Self> {
+        std::env::var(key)
+            .ok()
+            .and_then(|password| Self::from_string(password.into()))
     }
 
     #[tracing::instrument(level = "trace", skip_all)]

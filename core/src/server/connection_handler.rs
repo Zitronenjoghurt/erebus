@@ -1,13 +1,13 @@
 use crate::server::connection::Connection;
+use crate::server::socket_id::SocketId;
 use dashmap::DashMap;
-use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpStream;
 use tracing::debug;
 
 #[derive(Clone)]
 pub struct ConnectionHandler {
-    connections: Arc<DashMap<SocketAddr, Arc<Connection>>>,
+    connections: Arc<DashMap<SocketId, Arc<Connection>>>,
 }
 
 impl ConnectionHandler {
@@ -17,14 +17,14 @@ impl ConnectionHandler {
         }
     }
 
-    pub fn handle(&self, stream: TcpStream, addr: SocketAddr) {
-        let connection = Connection::spawn(self.clone(), stream, addr);
-        self.connections.insert(addr, connection);
-        debug!("Added connection from {}", addr);
+    pub fn handle(&self, stream: TcpStream, id: SocketId) {
+        let connection = Connection::spawn(self.clone(), stream, id);
+        self.connections.insert(id, connection);
+        debug!("Added connection {}", id);
     }
 
-    pub fn remove(&self, addr: SocketAddr) {
-        self.connections.remove(&addr);
-        debug!("Removed connection from {}", addr);
+    pub fn remove(&self, id: SocketId) {
+        self.connections.remove(&id);
+        debug!("Removed connection {}", id);
     }
 }

@@ -11,7 +11,7 @@ pub struct ErebusServerState {
 
 impl ErebusServerState {
     pub fn new() -> ErebusResult<Self> {
-        let db_path = PathBuf::from("./server.db");
+        let db_path = PathBuf::from("./data/server.db");
         let db = Database::initialize(&db_path)?;
         info!("Database initialized at: {}", db_path.display());
 

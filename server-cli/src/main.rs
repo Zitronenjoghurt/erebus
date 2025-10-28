@@ -22,6 +22,8 @@ fn main() {
     #[cfg(debug_assertions)]
     init_tracing();
 
+    dotenvy::dotenv().ok();
+
     Cli::execute();
 }
 

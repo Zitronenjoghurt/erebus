@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  erebus-server:
+    image: erebus-server:latest
+    build:
+      context: ..
+      dockerfile: server-docker/Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "58469:58469"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

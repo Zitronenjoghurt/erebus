@@ -16,14 +16,8 @@ pub struct Database {
 impl Database {
     pub fn initialize(path: &Path) -> ErebusResult<Self> {
         let create_new = !path.exists();
-        let password = if create_new {
-            println!("To create a new database, please enter a password. It will be used to encrypt all data in the database. You will be prompted for the password again to confirm it and you will have to enter it every time you start the Erebus server.");
-            Password::prompt_with_confirmation()
-        } else {
-            println!("Please enter the database password.");
-            Password::prompt()
-        }
-        .ok_or(ErebusError::PasswordUndisclosable)?;
+        let password =
+            Password::from_env("DATABASE_PASSWORD").ok_or(ErebusError::DatabasePassword)?;
 
         let redb = redb::Database::create(path)?;
         let db = Self { db: redb, password };
@@ -46,11 +40,11 @@ impl Database {
         let Ok(Some(pw_verifier)) =
             self.find::<PasswordVerifier>(PasswordVerifier::PW_VERIFY_STRING.to_string())
         else {
-            return Err(ErebusError::PasswordUndisclosable);
+            return Err(ErebusError::DatabasePassword);
         };
 
         if !pw_verifier.verify() {
-            Err(ErebusError::PasswordUndisclosable)
+            Err(ErebusError::DatabasePassword)
         } else {
             Ok(())
         }

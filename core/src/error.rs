@@ -10,8 +10,8 @@ pub enum ErebusError {
     Encryption,
     #[error("Decryption error")]
     Decryption,
-    #[error("Something went wrong with a password which can't be disclosed")]
-    PasswordUndisclosable,
+    #[error("Database password error")]
+    DatabasePassword,
     #[error("Client error: {0}")]
     Client(#[from] crate::client::error::ErebusClientError),
     #[error("Database error: {0}")]
