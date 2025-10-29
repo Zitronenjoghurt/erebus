@@ -1,5 +1,9 @@
 use crate::client::command::ClientCommand;
+use crate::client::error::ErebusClientError;
 use crate::client::event::ClientEvent;
+use crate::client::message::ClientMessage;
+use crate::client::state::ClientState;
+use crate::crypto::registration_challenge::RegistrationChallengeWithCode;
 use crate::error::{ErebusError, ErebusResult};
 use crate::message::{MessageRecv, MessageSend};
 use crate::server::message::ServerMessage;
@@ -8,6 +12,7 @@ use tokio::net::tcp::WriteHalf;
 use tokio::net::TcpStream;
 
 pub struct ErebusClientContext {
+    state: ClientState,
     server_address: String,
     command_receiver: Receiver<ClientCommand>,
     event_sender: Sender<ClientEvent>,
@@ -15,21 +20,24 @@ pub struct ErebusClientContext {
 
 impl ErebusClientContext {
     pub fn spawn(
+        state: ClientState,
         server_address: impl AsRef<str>,
         command_receiver: Receiver<ClientCommand>,
         event_sender: Sender<ClientEvent>,
     ) -> ErebusResult<std::thread::JoinHandle<()>> {
-        let context = Self::new(server_address, command_receiver, event_sender)?;
+        let context = Self::new(state, server_address, command_receiver, event_sender)?;
         let handle = std::thread::spawn(move || context.run());
         Ok(handle)
     }
 
     pub fn new(
+        state: ClientState,
         server_address: impl AsRef<str>,
         command_receiver: Receiver<ClientCommand>,
         event_sender: Sender<ClientEvent>,
     ) -> ErebusResult<Self> {
         Ok(Self {
+            state,
             server_address: server_address.as_ref().to_string(),
             command_receiver,
             event_sender,
@@ -68,7 +76,10 @@ impl ErebusClientContext {
                     }
                 } => {
                     if let Some(command) = command_result? {
-                        self.handle_command(&mut writer, command).await?;
+                        let result = self.handle_command(&mut writer, command).await;
+                        if let Err(e) = result {
+                            self.send_event(ClientEvent::Error(e));
+                        }
                     }
                 }
 
@@ -90,8 +101,8 @@ impl ErebusClientContext {
         command: ClientCommand,
     ) -> ErebusResult<()> {
         match command {
-            ClientCommand::Send(message) => {
-                message.send(tcp_writer).await?;
+            ClientCommand::Register { invite_code } => {
+                self.handle_register(tcp_writer, invite_code).await?
             }
         }
 
@@ -103,7 +114,29 @@ impl ErebusClientContext {
         tcp_writer: &mut WriteHalf<'_>,
         message: ServerMessage,
     ) -> ErebusResult<()> {
-        self.send_event(ClientEvent::ReceivedMessage(message));
+        Ok(())
+    }
+}
+
+// Command handling
+impl ErebusClientContext {
+    async fn handle_register(
+        &self,
+        tcp_writer: &mut WriteHalf<'_>,
+        invite_code: String,
+    ) -> ErebusResult<()> {
+        if !self.state.read_auth(|auth| auth.can_register()) {
+            return Err(ErebusClientError::AlreadyRegistered.into());
+        };
+
+        let (payload, original_challenge) = RegistrationChallengeWithCode::generate(invite_code)?;
+        self.state
+            .write_auth(|auth| auth.set_authentication_pending(original_challenge));
+
+        ClientMessage::RegisterChallenge(payload)
+            .send(tcp_writer)
+            .await?;
+
         Ok(())
     }
 }

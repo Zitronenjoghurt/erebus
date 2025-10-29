@@ -1,3 +1,5 @@
+use crate::client::command::ClientCommand;
+use crate::client::state::ClientState;
 use crate::error::ErebusResult;
 use std::sync::mpsc::{Receiver, Sender};
 
@@ -9,9 +11,12 @@ pub mod error;
 #[cfg(feature = "client")]
 pub mod event;
 pub mod message;
+#[cfg(feature = "client")]
+mod state;
 
 #[cfg(feature = "client")]
 pub struct ErebusClient {
+    pub state: ClientState,
     command_sender: Sender<command::ClientCommand>,
     event_receiver: Receiver<event::ClientEvent>,
     thread_handle: Option<std::thread::JoinHandle<()>>,
@@ -23,10 +28,16 @@ impl ErebusClient {
         let (command_sender, command_receiver) = std::sync::mpsc::channel();
         let (event_sender, event_receiver) = std::sync::mpsc::channel();
 
-        let thread_handle =
-            context::ErebusClientContext::spawn(server_address, command_receiver, event_sender)?;
+        let state = ClientState::initialize();
+        let thread_handle = context::ErebusClientContext::spawn(
+            state.clone(),
+            server_address,
+            command_receiver,
+            event_sender,
+        )?;
 
         Ok(Self {
+            state,
             command_sender,
             event_receiver,
             thread_handle: Some(thread_handle),
@@ -37,10 +48,14 @@ impl ErebusClient {
         self.event_receiver.try_iter().collect()
     }
 
-    pub fn send_message(&self, message: message::ClientMessage) {
-        let _ = self
-            .command_sender
-            .send(command::ClientCommand::Send(message));
+    pub fn send_command(&self, command: command::ClientCommand) {
+        let _ = self.command_sender.send(command);
+    }
+
+    pub fn register(&self, invite_code: impl AsRef<str>) {
+        self.send_command(ClientCommand::Register {
+            invite_code: invite_code.as_ref().to_string(),
+        })
     }
 }
 

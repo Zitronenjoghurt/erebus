@@ -27,4 +27,8 @@ impl ErebusServerState {
     {
         self.db.for_each::<InviteCode, _>(f)
     }
+
+    pub fn invite_find(&self, code: &str) -> ErebusResult<Option<InviteCode>> {
+        self.db.find(code.to_string())
+    }
 }

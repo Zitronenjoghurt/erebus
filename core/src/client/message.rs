@@ -1,6 +1,7 @@
+use crate::crypto::registration_challenge::RegistrationChallengeWithCode;
 use bincode::{Decode, Encode};
 
-#[derive(Debug, Encode, Decode)]
+#[derive(Encode, Decode)]
 pub enum ClientMessage {
-    Hello,
+    RegisterChallenge(RegistrationChallengeWithCode),
 }

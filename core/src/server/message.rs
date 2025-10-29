@@ -1,6 +1,10 @@
+use crate::crypto::registration_challenge::RegistrationChallenge;
 use bincode::{Decode, Encode};
 
-#[derive(Debug, Encode, Decode)]
+pub mod error;
+
+#[derive(Encode, Decode)]
 pub enum ServerMessage {
-    Hello,
+    Error(error::ErebusServerError),
+    RegisterChallengeSolved(RegistrationChallenge),
 }

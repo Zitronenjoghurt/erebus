@@ -1,4 +1,3 @@
-use erebus_core::client::message::ClientMessage;
 use erebus_core::client::ErebusClient;
 
 fn main() {
@@ -6,11 +5,8 @@ fn main() {
     init_tracing();
 
     let client = ErebusClient::start("127.0.0.1:58469").unwrap();
-    client.send_message(ClientMessage::Hello);
+    client.register("OGffXvbHRXyv3JKaqHzItFFePwsHHfSkbB7k35BD9ls");
     loop {
-        for event in client.poll_events() {
-            println!("{event:?}")
-        }
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
 }

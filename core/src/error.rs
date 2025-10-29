@@ -4,6 +4,8 @@ pub type ErebusResult<T> = Result<T, ErebusError>;
 
 #[derive(Debug, Error)]
 pub enum ErebusError {
+    #[error("Invalid invite code")]
+    InvalidInviteCode,
     #[error("Lost connection to the context thread")]
     ContextDisconnected,
     #[error("Encryption error")]
@@ -14,6 +16,8 @@ pub enum ErebusError {
     DatabasePassword,
     #[error("Client error: {0}")]
     Client(#[from] crate::client::error::ErebusClientError),
+    #[error("Base64 decode error: {0}")]
+    Base64Decode(#[from] base64::DecodeError),
     #[error("Database error: {0}")]
     Database(#[from] redb::DatabaseError),
     #[error("Database storage error: {0}")]

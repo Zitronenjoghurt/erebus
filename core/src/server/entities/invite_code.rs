@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
 pub struct InviteCode {
     pub code: PublicKey,
-    verify: PrivateKey,
+    pub verify: PrivateKey,
 }
 
 impl Entity for InviteCode {

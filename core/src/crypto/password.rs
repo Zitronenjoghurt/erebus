@@ -1,14 +1,20 @@
-use crate::crypto::sha256_bytes;
+use crate::crypto::{encode_base64, sha256_bytes};
 use crate::error::{ErebusError, ErebusResult};
 use argon2::Argon2;
+use bincode::{Decode, Encode};
 use chacha20poly1305::aead::Aead;
 use chacha20poly1305::{AeadCore, ChaCha20Poly1305, KeyInit, Nonce};
 use rand_core::OsRng;
 use zeroize::Zeroizing;
 
+#[derive(Encode, Decode)]
 pub struct Password([u8; 32]);
 
 impl Password {
+    pub fn new(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+
     pub fn from_string(password: Zeroizing<String>) -> Option<Self> {
         let salt: [u8; 32] = sha256_bytes(password.as_bytes());
         let argon2 = Argon2::default();
@@ -60,5 +66,9 @@ impl Password {
         cipher
             .decrypt(nonce, ciphertext)
             .map_err(|_| ErebusError::Decryption)
+    }
+
+    pub fn as_base64(&self) -> String {
+        encode_base64(&self.0)
     }
 }

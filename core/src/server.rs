@@ -3,6 +3,7 @@ use crate::error::ErebusResult;
 use crate::server::connection_handler::ConnectionHandler;
 use crate::server::socket_id::SocketId;
 use crate::server::state::ErebusServerState;
+use std::sync::Arc;
 use tokio::net::TcpListener;
 use tracing::info;
 
@@ -15,12 +16,14 @@ mod entities;
 pub mod message;
 #[cfg(feature = "server")]
 mod services;
+#[cfg(feature = "server")]
 pub mod socket_id;
+#[cfg(feature = "server")]
 pub mod state;
 
 #[cfg(feature = "server")]
 pub struct ErebusServer {
-    state: ErebusServerState,
+    state: Arc<ErebusServerState>,
     listener: TcpListener,
     connection_handler: ConnectionHandler,
 }
@@ -36,7 +39,7 @@ impl ErebusServer {
         info!("TCP listener bound");
 
         Ok(Self {
-            state,
+            state: Arc::new(state),
             listener,
             connection_handler: ConnectionHandler::new(),
         })
@@ -48,7 +51,8 @@ impl ErebusServer {
             let (stream, addr) = self.listener.accept().await?;
             let socket_id = SocketId::from(addr);
             info!("Connected to {}", socket_id);
-            self.connection_handler.handle(stream, socket_id);
+            self.connection_handler
+                .handle(self.state.clone(), stream, socket_id);
         }
     }
 }

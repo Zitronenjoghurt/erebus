@@ -21,6 +21,7 @@ target
 .idea/
 
 # Custom
-build
+data/
+build/
 server-docker/data
 server-docker/cli

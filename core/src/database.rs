@@ -4,13 +4,14 @@ use crate::database::pw_verify::PasswordVerifier;
 use crate::error::{ErebusError, ErebusResult};
 use redb::{ReadableDatabase, ReadableMultimapTable, ReadableTable, ReadableTableMetadata};
 use std::path::Path;
+use std::sync::Arc;
 
 pub mod entity;
 mod pw_verify;
 
 pub struct Database {
     db: redb::Database,
-    password: Password,
+    password: Arc<Password>,
 }
 
 impl Database {
@@ -20,7 +21,10 @@ impl Database {
             Password::from_env("DATABASE_PASSWORD").ok_or(ErebusError::DatabasePassword)?;
 
         let redb = redb::Database::create(path)?;
-        let db = Self { db: redb, password };
+        let db = Self {
+            db: redb,
+            password: Arc::new(password),
+        };
 
         if create_new {
             db.create_password_verifier()?;

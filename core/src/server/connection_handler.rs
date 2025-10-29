@@ -1,5 +1,6 @@
 use crate::server::connection::Connection;
 use crate::server::socket_id::SocketId;
+use crate::server::state::ErebusServerState;
 use dashmap::DashMap;
 use std::sync::Arc;
 use tokio::net::TcpStream;
@@ -17,8 +18,8 @@ impl ConnectionHandler {
         }
     }
 
-    pub fn handle(&self, stream: TcpStream, id: SocketId) {
-        let connection = Connection::spawn(self.clone(), stream, id);
+    pub fn handle(&self, state: Arc<ErebusServerState>, stream: TcpStream, id: SocketId) {
+        let connection = Connection::spawn(state, self.clone(), stream, id);
         self.connections.insert(id, connection);
         debug!("Added connection {}", id);
     }
